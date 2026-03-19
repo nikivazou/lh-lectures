@@ -25,6 +25,8 @@ library
     , Lecture_07_CaseStudyMapReduce
     , Lecture_08_NaturalDeduction
     , Lecture_09_DataPropositions
+  other-modules:
+      Language.Haskell.Liquid.ProofCombinators
   hs-source-dirs:
       src
   default-language: Haskell2010
