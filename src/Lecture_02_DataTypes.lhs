@@ -1,0 +1,880 @@
+Data Types
+============
+
+
+\begin{code}
+{-# OPTIONS_GHC -fplugin=LiquidHaskell #-}
+{-@ LIQUID "--no-termination" @-}
+module Lecture_02_DataTypes where
+
+import Data.List    (foldl')
+import Prelude hiding (head, tail, (!!), elem, zip, take, drop, reverse)
+import Data.Maybe   (fromJust)
+
+main :: IO ()
+main = return ()
+\end{code}
+
+
+
+In last lecture, we saw refinement types on primitive values and functions 
+and the language of the predicates that includes arithmetic, boolean, and
+uninterpreted functions. 
+Today, we will see how to use refinement types on data types.
+Concretely, 
+
+1. We will define new and use new logical functions on user defined data types. 
+2. We use refinements on definitions of data types to specify invariants.
+3. We will see how to use LiquidHaskell to reason about Haskell's lists.
+
+
+
+Measures 
+------
+
+We will start with the most famous data type, the list
+and see how we can use refinement types for safe indexing in lists, 
+e.g., to 
+
+1. _define_ the length of a list, 
+2. _compute_ the length of a list, and 
+3. _restrict_ the indexing of lists to valid indices.
+
+
+Here is the standard list data type in Haskell:
+
+\begin{code}
+data List a = Nil | Cons a (List a)
+\end{code}
+
+We use the *measure* definition to define the length of a list.
+
+\begin{code}
+{-@ measure llen @-}
+{-@ llen :: List a -> Nat @-}
+llen :: List a -> Int
+llen Nil        = 0
+llen (Cons x l) = 1 + llen l
+\end{code}
+
+
+_Note:_ The `measure` keyword has two uses in LiquidHaskell.
+
+1. Last time we saw that the `measure` keyword is used to define an uninterpreted SMT function. 
+2. Used without a type signature with the same name as a Haskell function, 
+the `measure` keyword is used to lift the Haskell function to the refinement logic.
+
+
+Concretely, a "measure" is a function that has *one* argument
+which is a Algebraic Data Type (ADT), like a list. 
+The one argument restriction is very important because it allows LiquidHaskell
+to automate the verification.^[
+    In a next lecture we will see how one can use reflection to lift in the logic 
+    functions with more than one argument, but then verification is no more automated.
+]
+The measure definition "lifts" the Haskell function to the refinement logic,
+by refining the types of the data constructors with the exact definition of the function. 
+
+For example, the `llen` measure definition refines the type of the lists constructor to be:
+
+~~~~~{.spec}
+Nil  :: {v:List a | llen v = 0}
+Cons :: x:a -> l:List a -> {v:List a | llen v = 1 + llen l}
+~~~~~
+
+
+With these refinements, verification can reason about the length of lists: 
+
+\begin{code}
+
+{-@ twoElems :: {v:List Int | llen v == 2} @-}
+twoElems :: List Int 
+twoElems = Cons 4 (Cons 2 Nil)
+
+\end{code}
+
+
+Type checking `twoElems`, using ANF, looks like this: 
+
+~~~~~{.spec}
+
+let l0 = Nil        :: {v:List a | llen v = 0}
+    l1 = Cons 2 l0  :: {v:List a | llen v = 1 + llen l0}
+in Cons 4 l1        :: {v:List a | llen v = 1 + llen l1}
+~~~~~
+
+
+Multiple Measures
+------------------
+
+We can define multiple measures for the same data type, 
+in which case, the refinements are _conjoined_ together.
+
+For example, we can define a measure that checks empiness of a list. 
+
+\begin{code}
+{-@ measure isempty @-}
+isempty :: List a -> Bool
+isempty Nil = True
+isempty _   = False
+\end{code}
+
+
+With these two measure definitions, the types of the list constructors are refined to:
+
+~~~~~{.spec}
+Nil  :: {v:List a | llen v = 0 && isempty v}
+Cons :: x:a -> l:List a -> {v:List a | llen v = 1 + llen l && not (isempty v)}
+~~~~~
+
+
+**Question:** Let's define the `head` and `tail` functions for lists.
+
+\begin{code}
+
+head :: List a -> a
+head = undefined 
+
+
+tail :: List a -> List a
+tail = undefined 
+
+\end{code}
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> _The functions `head` and `tail` can be defined as follows: _</p>
+
+~~~~~{.spec}
+head :: List a -> a
+{-@ head :: x:{List a | 0 < llen x} -> a @-}
+head (Cons x _ ) = x 
+
+{-@ tail :: x:{List a | 0 < llen x} -> {v:List a | llen v = llen x - 1 } @-}
+tail :: List a -> List a 
+tail (Cons _ x) = x 
+~~~~~
+
+</details>
+
+**Question:** Can you give a strong engouth type for tail 
+to verify length of result? 
+
+
+\begin{code}
+
+{- oneElem :: {v:List Int | llen v == 1} @-}
+oneElem :: List Int 
+oneElem = tail twoElems
+
+\end{code}
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> _The type provided before is strong enough 
+because its postcondition state that the result list 
+has the same length as the input list minus one.
+This strong postcondition is not required to define 
+the function tail, but it is required to verify the
+uses of the function._
+</p>
+</details>
+
+
+**Question:** Let's now define a safe indexing function for lists.
+
+
+\begin{code}
+
+{-@ (!!) :: xs:List a -> {i:Int | 0 <= i && i < llen xs } -> a @-}
+(!!) :: List a -> Int -> a
+(!!) = undefined
+
+\end{code}
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> _The function `(!!)` can be defined as follows:_ </p>
+
+~~~~~{.spec}
+{-@ (!!) :: xs:List a -> {i:Int | 0 <= i && i < llen xs } -> a @-}
+(!!) :: List a -> Int -> a
+(Cons x _)  !! 0 = x 
+(Cons _ xs) !! i = xs !! (i-1)
+~~~~~
+
+Note that because `!!` is named using symbols instead of letters,
+it can be use as an infix operator, and needs to be enclosed in parentheses
+when used in prefix notation. 
+That is, `xs !! i` is the same as `(!!) xs i`.
+
+</details>
+
+**Question:** Let's now define a safe lookup function for lists,
+using the case sensitivity of refinement types. 
+
+\begin{code}
+safeLookup :: List a -> Int -> Maybe a
+safeLookup = undefined
+\end{code}
+
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> _The function `safeLookup` can be defined as follows:_ </p>
+
+~~~~~{.spec}
+safeLookup :: List a -> Int -> Maybe a
+safeLookup xs i = if 0 <= i && i < llen xs then Just (xs !! i) else Nothing
+~~~~~
+
+</details>
+
+Recursive Functions 
+----------------------
+
+Let's write a recursive function that adds up the values of an integer list. 
+
+\begin{code}
+listSum :: List Int -> Int
+listSum xs = go 0 0 
+  where 
+    go acc i  
+      | i < llen xs = go (acc + (xs !! i)) (i+1)
+      | otherwise   = acc
+\end{code}
+
+**Question:** What happens if you _replace_ the guard with `i <= llen xs`?
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> _The function will fail to typecheck because the indexing of lists is out of bounds._ </p>
+
+</details>
+
+**Question:** Write a variant of the above function that 
+computes the `absoluteSum` of the list, i.e., the sum of the absolute values of the elements.
+
+\begin{code}
+{-@ absSum :: List Int -> Nat @-}
+absSum :: List Int -> Int
+absSum = undefined 
+\end{code}
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> _In the body of `go` where the indexing happens, 
+apply an absolute value function that 
+returns the absolute value of the indexed element._
+ </p>
+
+~~~~~{.spec}
+{-@ absSum :: List Int -> Nat @-}
+absSum :: List Int -> Int
+absSum xs = go 0 0 
+  where 
+    go acc i  
+      | i < llen xs = go (acc + myAbs (xs !! i)) (i+1)
+      | otherwise   = acc
+      
+{-@ myAbs :: Int -> Nat @-} 
+myAbs :: Int -> Int 
+myAbs x = if x < 0 then -x else x 
+~~~~~
+
+</details>
+
+LiquidHaskell verifies `listSum`, or to be precise the safety of list indexing. 
+The verification works because Liquid Haskell is able to _automatically infer_
+
+~~~~~{.spec}
+go :: Int -> {v:Int | 0 <= v && v <= llen xs} -> Int
+~~~~~
+
+which states that the second parameter `i` is between 0 and the length of the list (inclusive).
+LiquidHaskell uses this and the test that `i < llen xs` to verify that the indexing is safe.
+
+_Note:_ LiquidHaskell automatically tests the termination of recursive functions. 
+The default termination metric for the above functions fail. Later, we will see how to fix this.
+But for now, we can disable termination checking, but declaring functions as `lazy`.
+
+\begin{code}
+{-@ lazy listSum @-}
+{-@ lazy absSum @-}
+\end{code}
+
+**Question:** Why does the type of `go` has `v <= llen xs` and not `v < llen xs`?
+
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> _Because `go` also needs to enter in the base case to exit the loop!_ </p>
+
+</details>
+
+
+Higher-Order Functions
+-----------------------
+We already used the `go` structure twice, so let's generalize the common pattern! 
+Let's refactor the above low-level recursive function
+into a generic higher-order `loop`.
+
+\begin{code}
+{-@ lazy loop @-}
+loop :: Int -> Int -> a -> (Int -> a -> a) -> a
+loop lo hi base f =  go base lo
+  where
+    go acc i
+      | i < hi    = go (f i acc) (i + 1)
+      | otherwise = acc
+\end{code}
+
+We can now use `loop` to implement `listSum`:
+
+\begin{code}
+{-@ lazy listSum' @-}
+listSum'      :: List Int -> Int
+listSum' xs  = loop 0 n 0 body
+  where
+    body i acc  = acc + (xs !! i)
+    n           = llen xs
+\end{code}
+
+\newthought{Inference} is a convenient option. LiquidHaskell finds:
+
+\begin{code}
+{-@ type Btwn Lo Hi = {v:Int | Lo <= v && v < Hi} @-}
+{-@ loop :: lo:Nat -> hi:{Nat|lo <= hi} -> a 
+         -> (Btwn lo hi -> a -> a) -> a @-}
+\end{code}
+
+\noindent In English, the above type states that
+
+- `lo` the loop *lower* bound is a non-negative integer
+- `hi` the loop *upper* bound is a greater than or equal to `lo`,
+- `f`  the loop *body* is only called with integers between `lo` and `hi`.
+
+\noindent
+It can be tedious to have to keep typing things like the above.
+If we wanted to make `loop` a public or exported function, we
+could use the inferred type to generate an explicit signature.
+
+At the call `loop 0 n 0 body` the parameters `lo` and `hi` are
+instantiated with `0` and `n` respectively, which, by the way
+is where the inference engine deduces non-negativity.
+Thus LiquidHaskell concludes that `body` is only called with
+values of `i` that are *between* `0` and `(llen xs)`, which
+verifies the safety of the call `xs !! i`.
+
+**Question:**
+Complete the implementation of `absoluteSum'` below.
+When you are done, what is the type that is inferred for `body`?
+
+\begin{code}
+{-@ absoluteSum' :: List Int -> Nat @-}
+absoluteSum' :: List Int -> Int
+absoluteSum' xs = loop 0 n 0 body
+  where
+    body i acc   = undefined
+    n            = llen xs
+\end{code}
+
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> _The function `absoluteSum'` can be implemented as follows:_ </p>
+
+~~~~~{.spec}
+{-@ absoluteSum' :: List Int -> Nat @-}
+absoluteSum' :: List Int -> Int
+absoluteSum' xs = loop 0 n 0 body
+  where
+    body i acc   = acc + myAbs (xs!!i)
+    n            = llen xs
+~~~~~
+
+<p> _where `myAbs` is the absolute value function defined before.
+The type inferred for `body` is:_ </p>
+
+~~~~~{.spec}
+{-@ body :: Btwn 0 (llen xs) -> Nat -> Nat @-}
+~~~~~
+
+</details>
+
+
+
+**Question:**
+The following uses `loop` to compute
+`dotProduct`s. Why does LiquidHaskell flag an error?
+Fix the code or specification so that LiquidHaskell
+accepts it. 
+
+\begin{code}
+{-@ ignore dotProduct @-}
+-- >>> dotProduct ([1,2,3]) ( [4,5,6])
+-- 32
+{-@ dotProduct :: x:List Int -> y:List Int  -> Int @-}
+dotProduct :: List Int -> List Int -> Int
+dotProduct x y = loop 0 sz 0 body
+  where
+    body i acc = acc + (x !! i)  *  (y !! i)
+    sz         = llen x
+\end{code}
+
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> 
+_First, to see the error, you need to remove the `ignore` annotation.
+The error occurs because `loop` is defined over the length of the list 
+`x`, but the indexing is done over the length of the list `y`.
+To fix the error, you can refine the type of `dotProduct` to require that
+the length of the two lists is the same._
+ </p>
+
+~~~~~{.spec}
+{-@ dotProduct :: x:List Int -> y:{List Int | llen x == llen y}  -> Int @-}
+~~~~~
+
+</details>
+
+
+
+Folding (Indexed Lists)
+----------------------------------------
+
+
+Let's now use lists to represent sparse vectors, 
+meaning vectors with many zeros. 
+
+\begin{code}
+{-@ type SparseN a N = [(Btwn 0 N, a)] @-}
+\end{code}
+
+\noindent Implicitly, all indices *other* than those in the list
+have the value `0` (or the equivalent value for the type `a`).
+
+\newthought{The Alias} `SparseN` is just a
+shorthand for the (longer) type on the right, it does not
+*define* a new type. If you are familiar with the *index-style*
+length encoding e.g. as found in [DML][dml] or [Agda][agdavec],
+then note that despite  appearances, our `Sparse` definition
+is *not* indexed.
+
+\newthought{Sparse Products}
+Let's write a function to compute a sparse product
+
+\begin{code}
+{-@ sparseProduct  :: x:List Int -> SparseN Int (llen x) -> Int @-}
+sparseProduct :: List Int -> [(Int, Int)] -> Int
+sparseProduct x y   = go 0 y
+  where
+    go n []         = n
+    go n ((i,v):y') = go (n + (x!!i) * v) y'
+\end{code}
+
+LiquidHaskell verifies the above by using the specification
+to conclude that for each tuple `(i, v)` in the list `y`, the
+value of `i` is within the bounds of the list `x`, thereby
+proving `x !! i` safe.
+
+\newthought{Folds}
+The sharp reader will have undoubtedly noticed that the sparse product
+can be more cleanly expressed as a [fold][foldl]:
+
+~~~~~{.spec}
+foldl' :: (a -> b -> a) -> a -> [b] -> a
+~~~~~
+
+\noindent We can simply fold over the sparse vector, accumulating the `sum`
+as we go along
+
+\begin{code}
+{-@ sparseProduct'  :: x:List Int -> SparseN Int (llen x) -> Int @-}
+sparseProduct' :: List Int -> [(Int, Int)] -> Int
+sparseProduct' x y  = foldl' body 0 y
+  where
+    body sum (i, v) = sum + (x !! i) * v
+\end{code}
+
+\noindent
+LiquidHaskell digests this without difficulty.
+The main trick is in how the polymorphism of
+`foldl'` is instantiated.
+
+1. GHC infers that at this site, the type variable `b` from the
+   signature of `foldl'` is instantiated to the Haskell type `(Int, a)`.
+
+2. Correspondingly, LiquidHaskell infers that in fact `b`
+   can be instantiated to the *refined* `(Btwn 0 (llen x), a)`.
+
+Thus, the inference mechanism saves us a fair bit of typing and
+allows us to reuse existing polymorphic functions over containers
+and such without ceremony.
+
+
+
+**Question:** Modify the `sparseProduct'` function to only add the elements 
+that are indexed by odd indices. 
+
+
+\begin{code}
+{-@ oddProduct  :: x:List Int -> SparseN Int (llen x) -> Int @-}
+oddProduct :: List Int -> [(Int, Int)] -> Int
+oddProduct x y  = undefined
+\end{code}
+
+<details>
+
+<summary>**Solution**</summary>
+
+_The function `oddProduct` can be implemented as follows:_ 
+
+~~~~~{.spec}
+{-@ oddProduct  :: x:List Int -> SparseN Int (llen x) -> Int @-}
+oddProduct :: List Int -> [(Int, Int)] -> Int
+oddProduct x y  = foldl' body 0 y
+  where
+    body sum (i, v) | i `mod` 2 == 1 = sum + (x !! i) * v
+                    | otherwise      = sum   
+~~~~~
+
+</details>
+
+
+
+Data Invariants: Sparse Vectors 
+-------------------------------------
+
+Liquid Haskell allows to write invariants on data types. 
+As an example, let's revisit the sparse vector representation that we saw earlier.
+The `SparseN` type alias we used got the job done, 
+but is not pleasant to work with because we have no way of determining 
+the *dimension* of the sparse vector.
+Instead, let's create a new
+datatype to represent such vectors:
+
+\begin{code}
+data Sparse a = SP { spDim   :: Int
+                   , spElems :: [(Int, a)] }
+\end{code}
+
+\noindent
+Thus, a sparse vector is a pair of a dimension and a list of
+index-value tuples. Implicitly, all indices *other* than those
+in the list have the value `0` or the equivalent value type `a`.
+
+\newthought{Legal}
+`Sparse` vectors satisfy two crucial properties.
+First, the dimension stored in `spDim` is non-negative.
+Second, every index in `spElems` must be valid, i.e.
+between `0` and the dimension. Unfortunately, Haskell's
+type system does not make it easy to ensure that
+*illegal vectors are not representable*.^[The standard
+approach is to use abstract types and
+[smart constructors][smart-ctr-wiki] but even
+then there is only the informal guarantee that the
+smart constructor establishes the right invariants.]
+
+\newthought{Data Invariants} LiquidHaskell lets us enforce
+these invariants with a refined data definition:
+
+\begin{code}
+{-@ data Sparse a = SP { spDim   :: Nat
+                       , spElems :: [(Btwn 0 spDim, a)]} @-}
+\end{code}
+
+\newthought{Refined Data Constructors} The refined data
+definition is internally converted into refined types
+for the data constructor `SP`:
+
+~~~~~{.spec}
+-- Generated Internal representation
+data Sparse a where
+  SP :: spDim:Nat
+     -> spElems:[(Btwn 0 spDim, a)]
+     -> Sparse a
+~~~~~
+
+\noindent In other words, by using refined input types for `SP`
+we have automatically converted it into a *smart* constructor that
+ensures that *every* instance of a `Sparse` is legal.
+Consequently, LiquidHaskell verifies:
+
+\begin{code}
+okSP :: Sparse String
+okSP = SP 5 [ (0, "cat")
+            , (3, "dog") ]
+\end{code}
+
+\noindent but rejects, due to the invalid index:
+(If you remove the `ignore` notation, you will get an error!)
+
+\begin{code}
+{-@ ignore badSP @-}
+badSP :: Sparse String
+badSP = SP 5 [ (0, "cat")
+             , (6, "dog") ]
+\end{code}
+
+\newthought{Field Measures} It is convenient to write an alias
+for sparse vectors of a given size `N`. We can use the field name
+`spDim` as a *measure*, like `llen`. That is, we can use `spDim`
+inside refinements^[Note that *inside* a refined `data` definition,
+a field name like `spDim` refers to the value of the field, but *outside*
+it refers to the field selector measure or function.]
+
+\begin{code}
+{-@ type SparseIN a N = {v:Sparse a | spDim v == N} @-}
+\end{code}
+
+\newthought{Sparse Products}
+Let's write a function to compute a sparse product
+
+\begin{code}
+{-@ dotProd :: x:List Int -> SparseIN Int (llen x) -> Int @-}
+dotProd :: List Int -> Sparse Int -> Int
+dotProd x (SP _ y) = go 0 y
+  where
+    go sum ((i, v) : y') = go (sum + (x !! i) * v) y'
+    go sum []            = sum
+\end{code}
+
+\noindent
+LiquidHaskell verifies the above by using the specification
+to conclude that for each tuple `(i, v)` in the list `y`, the
+value of `i` is within the bounds of the list `x`, thereby
+proving `x !! i` safe.
+
+\newthought{Folded Product} We can port the `fold`-based product
+to our new representation:
+
+\begin{code}
+{-@ dotProd' :: x:List Int -> SparseIN Int (llen x) -> Int @-}
+dotProd' :: List Int -> Sparse Int -> Int
+dotProd' x (SP _ y) = foldl' body 0 y
+  where
+    body sum (i, v) = sum + (x !! i)  * v
+\end{code}
+
+\noindent As before, LiquidHaskell checks the above by
+[automatically instantiating refinements](#sparsetype)
+for the type parameters of `foldl'`, saving us a fair
+bit of typing and enabling the use of the elegant
+polymorphic, higher-order combinators we know and love.
+
+
+
+<div class="hwex" id="Addition">
+Write the specification and implementation
+of a function `plus` that performs the addition of two `Sparse`
+vectors of the *same* dimension, yielding an output of that dimension.
+When you are done, the following code should typecheck:
+</div>
+
+\begin{code}
+plus     :: (Num a) => Sparse a -> Sparse a -> Sparse a
+plus x y = undefined
+
+{- testPlus :: SparseIN Int 3 @-}
+testPlus :: Sparse Int
+testPlus    = plus vec1 vec2
+  where
+    vec1 = SP 3 [(0, 12), (2, 9)]
+    vec2 = SP 3 [(0, 8),  (1, 100)]
+\end{code}
+
+**Hint:** Fold over the elements of the second vector, starting from the first. 
+At each iteration `(i,x)`: 
+if `i` is _element_ of the first vector, 
+_update_ the value of the first vector, 
+otherwise _extend_ a new element to the first vector.
+Now define these helper functions: 
+
+\begin{code}
+
+elem :: Int -> Sparse a -> Bool 
+elem  = undefined 
+
+update :: Sparse a -> Int -> (a -> a) -> Sparse a
+update = undefined 
+
+extend :: Sparse a -> (Int, a) -> Sparse a 
+extend = undefined
+
+\end{code}
+
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> _The function `plus` as well as the helper functions can be implemented as follows:_ </p>
+
+~~~~~{.spec}
+{-@ plus :: (Num a) => sp:Sparse a 
+         -> SparseIN a (spDim sp) 
+         -> SparseIN a (spDim sp) @-}
+plus     :: (Num a) => Sparse a -> Sparse a -> Sparse a
+plus x (SP _ y) = foldl' body x y 
+  where body sp (i,v) | i `elem` sp = update sp i (+v) 
+                      | otherwise   = extend sp (i,v)
+
+
+elem :: Int -> Sparse a -> Bool 
+elem j (SP i x) = any (== j) (map fst x) 
+
+{-@ update :: sp:Sparse a -> Btwn 0 (spDim sp) -> (a -> a)
+           -> SparseIN a (spDim sp) @-}
+update :: Sparse a -> Int -> (a -> a) -> Sparse a
+update (SP d xs) i f = SP d (map go xs)
+  where go (j,v) = if i == j then (j,f v) else (j,v) 
+
+{-@ extend :: sp:Sparse a -> (Btwn 0 (spDim sp), a) -> SparseIN a (spDim sp) @-}
+extend :: Sparse a -> (Int, a) -> Sparse a 
+extend (SP d xs) iv = SP d (iv:xs)
+
+~~~~~
+
+</details>
+
+
+
+Ordered Lists 
+--------------
+
+As a second example of refined data types, let's consider a
+different problem: representing *ordered* sequences. Here's
+a type for sequences that mimics the classical list:
+
+
+\begin{code}
+data IncList a =
+    Emp
+  | (:<) { hd :: a, tl :: IncList a }
+
+infixr 9 :<
+\end{code}
+
+\noindent
+The Haskell type above does not state that the elements
+are in order of course, but we can specify that requirement
+by refining *every* element in `tl` to be *greater than* `hd`:
+
+\begin{code}
+{-@ data IncList a =
+        Emp
+      | (:<) { hd :: a, tl :: IncList {v:a | hd <= v}}  @-}
+\end{code}
+
+\newthought{Refined Data Constructors} Once again,
+the refined data definition is internally converted
+into a "smart" refined data constructor
+
+~~~~~{.spec}
+-- Generated Internal representation
+data IncList a where
+  Emp  :: IncList a
+  (:<) :: hd:a -> tl:IncList {v:a | hd <= v} -> IncList a
+~~~~~
+
+
+\noindent which ensures that we can only create legal ordered lists.
+
+\begin{code}
+okList :: IncList Int
+okList  = 1 :< 2 :< 3 :< Emp      -- accepted by LH
+
+{-@ ignore badList @-}
+badList :: IncList Int
+badList = 2 :< 1 :< 3 :< Emp      -- rejected by LH
+\end{code}
+
+\noindent
+It's all very well to *specify* ordered lists.
+Next, let's see how it's equally easy to *establish*
+these invariants by implementing several textbook
+sorting routines.
+
+\newthought{Insertion Sort}
+First, let's implement [insertion sort](https://en.wikipedia.org/wiki/Insertion_sort#/media/File:Insertion-sort-example-300px.gif), which converts an ordinary
+list `[a]` into an ordered list `IncList a`.
+
+\begin{code}
+insertSort        :: (Ord a) => [a] -> IncList a
+insertSort []     = Emp
+insertSort (x:xs) = insert x (insertSort xs)
+\end{code}
+
+The hard work is done by `insert` which places an element into
+the correct position of a sorted list. LiquidHaskell infers that
+if you give `insert` an element and a sorted list, it returns a
+sorted list.
+
+\begin{code}
+insert             :: (Ord a) => a -> IncList a -> IncList a
+insert y Emp       = y :< Emp
+insert y (x :< xs)
+  | y <= x         = y :< x :< xs
+  | otherwise      = x :< insert y xs
+\end{code}
+
+<div class="hwex" id="Insertion Sort">
+Complete the implementation of the function below to
+use [`foldr`](https://hackage.haskell.org/package/base-4.18.0.0/docs/Data-List.html#v:foldr) to eliminate the explicit recursion in `insertSort`.
+</div>
+
+\begin{code}
+insertSort'     :: (Ord a) => [a] -> IncList a
+insertSort' xs  = foldr f b xs
+  where
+     f          = undefined    -- Fill this in
+     b          = undefined    -- Fill this in
+\end{code}
+
+
+<details>
+
+<summary>**Solution**</summary>
+
+<p> _`f` is `insert` and `b` is `Emp`_ </p>
+
+</details>
+
+We will come back to the concept of increasing lists 
+and see how one can provide such a specification for Haskell's 
+lists. But for now, let's study easier properties of lists.
+
+
+
+
+Summary 
+------
+Today we saw how refinement interact with data types. 
+Concretely we saw:
+
+- how to define _measures_ to specify properties of user defined 
+data and 
+- how to _refine_ the definitions of data types to specify _invariants_.
+
+Finally, we saw how all these features interact with existing Haskell libraries, 
+and concretely how to use LiquidHaskell to reason about Haskell's lists. 

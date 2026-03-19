@@ -1,0 +1,37 @@
+cabal-version: 2.4
+
+name:           lh-lectures
+version:        0.1.0.0
+synopsis:       Lectures for Liquid Haskell Class
+category:       Education
+homepage:       https://github.com/nikivazou/lh-lectures
+author:         Niki Vazou
+maintainer:     niki.vazou@imdea.org
+copyright:      Niki Vazou
+license:        MIT
+build-type:     Simple
+
+extra-source-files:
+    README.md
+
+library
+  exposed-modules:
+      Lecture_01_RefinementTypes
+    , Lecture_02_DataTypes
+    , Lecture_03_Sortedness
+    , Lecture_04_Termination
+    , Lecture_05_ProofsPrograms
+    , Lecture_06_StructuralInduction
+    , Lecture_07_CaseStudyMapReduce
+    , Lecture_08_NaturalDeduction
+    , Lecture_09_DataPropositions
+  hs-source-dirs:
+      src
+  default-language: Haskell2010
+  build-depends:
+      base             >= 4.11 && < 5
+    , liquidhaskell
+    , liquid-base
+    , liquid-prelude
+    , liquid-containers
+    , containers
