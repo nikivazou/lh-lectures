@@ -31,7 +31,4 @@ library
   build-depends:
       base             >= 4.11 && < 5
     , liquidhaskell
-    , liquid-base
-    , liquid-prelude
-    , liquid-containers
     , containers
