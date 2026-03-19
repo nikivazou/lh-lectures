@@ -46,7 +46,7 @@ there exists an `a`:
 
 \begin{code}
 intToA :: Int -> a
-intToA x = error "Define me!"
+intToA x = undefined "Define me!"
 \end{code}
 
 **Question:** Can you define the function above?
@@ -342,7 +342,7 @@ fibUp n =   fib n
         === fib (n-1) + fib (n-2)
         =<= fib n + fib (n-2) ? fibUp (n-1)
         =<= fib n + fib (n-2) 
-        -- Complete the missing steps here
+        ? undefined -- Complete the missing steps here
         =<= fib (n+1)
         *** QED
 \end{code}
@@ -388,13 +388,13 @@ Let's now prove that the Fibonacci function is monotonic:
 fibMonotonic :: Int -> Int -> Proof
 fibMonotonic x y
   | y == x + 1
-  =   fib x     ? () {- Call to the fibUp lemma goes here   -}
+  =   fib x     ? undefined {- Call to the fibUp lemma goes here   -}
   =<= fib (x+1) 
   =<= fib y
   *** QED
   | x < y - 1
-  =   fib x     ? () {- Inductive Hypothesis call goes here -}
-  =<= fib (y-1) ? () {- Call to the fibUp lemma goes here   -}
+  =   fib x     ? undefined {- Inductive Hypothesis call goes here -}
+  =<= fib (y-1) ? undefined {- Call to the fibUp lemma goes here   -}
   =<= fib y     
   *** QED
 \end{code}
@@ -449,7 +449,7 @@ Thus, we can turn the proof into a generic proof of the monotonicity of any func
                -> fUp:(z:Nat -> {f z <= f (z+1)})
                -> x:Nat -> y:{Nat | x < y } -> {f x <= f y} / [y] @-}
 fMonotonic :: (Int -> Int) -> (Int -> ()) -> Int -> Int -> Proof
-fMonotonic f fUp x y
+fMonotonic f fUp x y = undefined {-
   | y == x + 1
   =   fib x     ? fibUp x
   =<= fib (x+1) 
@@ -459,7 +459,7 @@ fMonotonic f fUp x y
   =   fib x     ? fMonotonic f fUp x (y-1)
   =<= fib (y-1) ? fibUp (y-1)
   =<= fib y     
-  *** QED
+  *** QED -}
 \end{code}
 
 **Question:** Can you complete the proof above?

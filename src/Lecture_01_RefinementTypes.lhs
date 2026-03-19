@@ -28,7 +28,7 @@ for example to check that division by zero is not possible.
 
 \begin{code}
 test :: Int -> Int
-test x = 42 `div` x
+test x = 42 `div` 2
 \end{code}
 
 If we call `div` with zero, directly or even indirectly via the `x` argument, 

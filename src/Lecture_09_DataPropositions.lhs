@@ -57,7 +57,7 @@ data Eveness = EVEN N
 
 {-@ data EVEN where 
      E0 :: Prop (EVEN Z)
-   | E2 :: n:N -> Prop (EVEN n) -> Prop (EVEN (S (S n))) @-}
+     E2 :: n:N -> Prop (EVEN n) -> Prop (EVEN (S (S n))) @-}
 \end{code}
 
 The two constructors `E0` and `E2` axiomatize the evenness of numbers.
@@ -240,10 +240,10 @@ data Step where
     SAppPL :: e1:Expr -> e1':Expr -> e2:Expr 
            -> Prop (Step e1 e1')          
            -> Prop (Step (EApp e1 e2) (EApp e1' e2)) 
-  | SAppPR :: e1:Expr -> e2:Expr -> e2':Expr 
+    SAppPR :: e1:Expr -> e2:Expr -> e2':Expr 
            -> Prop (Step e2 e2')
            -> Prop (Step (EApp e1 e2) (EApp e1 e2')) 
-  | SAppE  :: e:Expr -> ex:Expr -> tx:Type 
+    SAppE  :: e:Expr -> ex:Expr -> tx:Type 
            -> Prop (Step (EApp (ELam tx e) ex) (subst e ex)) 
   @-}
 \end{code}
@@ -256,7 +256,7 @@ That is `Evals e e'` defines the relation `e ->* e'`, which, in general is not t
 {-@ 
 data Evals where 
     ERefl :: e:Expr -> Prop {Evals e e}
-  | EStep :: e1:{Expr | lc e1 } -> e2:{Expr | lc e2} -> e3:Expr
+    EStep :: e1:{Expr | lc e1 } -> e2:{Expr | lc e2} -> e3:Expr
           -> Prop (Step  e1 e2)
           -> Prop (Evals e2 e3) 
           -> Prop (Evals e1 e3)  
@@ -277,13 +277,13 @@ where $\Gamma$ is the typing environment, $e$ is the expression and $\tau$ is th
             -> Prop (HasType g e (TFun tx t)) 
             -> Prop (HasType g ex tx)
             -> Prop (HasType g (EApp e ex) t) 
-     | TLam :: g:Env -> e:Expr -> tx:Type -> t:Type 
+       TLam :: g:Env -> e:Expr -> tx:Type -> t:Type 
             -> x:{Var | not (member x (dom g)) && not (member x (freeVars e))} 
             -> Prop (HasType (EBind x tx g) (subst e (EFVar x)) t) 
             -> Prop (HasType g (ELam tx e) (TFun tx t)) 
-     | TVar :: g:Env -> x:{Var | member x (dom g)} 
+       TVar :: g:Env -> x:{Var | member x (dom g)} 
             -> Prop (HasType g (EFVar x) (lookupEnv g x))
-     | TTInt :: g:Env -> i:Int
+       TTInt :: g:Env -> i:Int
             -> Prop (HasType g (EInt i) TInt)
  @-}
 \end{code}

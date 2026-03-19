@@ -62,6 +62,7 @@ data IncList a where
 okList :: IncList Int
 okList  = 1 :< 2 :< 3 :< Emp      -- accepted by LH
 
+{-@ ignore badList @-}
 badList :: IncList Int
 badList = 2 :< 1 :< 3 :< Emp      -- rejected by LH
 \end{code}

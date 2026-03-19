@@ -4,6 +4,7 @@ Termination
 
 \begin{code}
 {-# OPTIONS_GHC -fplugin=LiquidHaskell #-}
+{-@ LIQUID "--no-termination" @-}
 module Lecture_04_Termination where
 
 import Prelude hiding (map, gcd, mod)

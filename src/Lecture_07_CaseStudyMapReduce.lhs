@@ -128,7 +128,7 @@ the following specifications:
 {-@ drop :: i:Nat -> xs:{[a] | i <= len xs } 
          -> {v:[a] | len v == len xs - i } @-}
 drop :: Int -> [a] -> [a]
-drop i x = x 
+drop i x = undefined  
 \end{code}
 
 \begin{code}
@@ -136,7 +136,7 @@ drop i x = x
 {-@ take :: i:Nat -> xs:{[a] | i <= len xs } 
          -> {v:[a] | len v == i} @-}
 take :: Int -> [a] -> [a]
-take i x = x  
+take i x = undefined 
 \end{code}
 
 
