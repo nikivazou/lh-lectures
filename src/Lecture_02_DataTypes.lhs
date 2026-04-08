@@ -132,8 +132,10 @@ Cons :: x:a -> l:List a -> {v:List a | llen v = 1 + llen l && not (isempty v)}
 
 \begin{code}
 
+{-@ head :: {v:List a | 0 < llen v} -> a @-}
 head :: List a -> a
-head = undefined 
+head (Cons x xs) = x 
+head Nil         = error "head of empty list"
 
 
 tail :: List a -> List a

@@ -20,13 +20,14 @@ library
     , Lecture_02_DataTypes
     , Lecture_03_Sortedness
     , Lecture_04_Termination
---     , Lecture_05_ProofsPrograms
---     , Lecture_06_StructuralInduction
+    , Task1
+    , Lecture_05_ProofsPrograms
+    , Lecture_06_StructuralInduction
 --     , Lecture_07_CaseStudyMapReduce
 --     , Lecture_08_NaturalDeduction
 --     , Lecture_09_DataPropositions
---   other-modules:
---       Language.Haskell.Liquid.ProofCombinators
+  other-modules:
+      Language.Haskell.Liquid.ProofCombinators
   hs-source-dirs:
       src
   default-language: Haskell2010

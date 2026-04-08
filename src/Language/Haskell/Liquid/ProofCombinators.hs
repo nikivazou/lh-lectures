@@ -31,11 +31,7 @@ module Language.Haskell.Liquid.ProofCombinators (
 
   -- * Combining Proofs
   , (&&&)
-  , withProof
   , impossible
-
-  -- * PLE-specific
-  , pleUnfold
 
 ) where
 
@@ -138,10 +134,6 @@ _ ==. x = x
 x &&& _ = x
 
 
-{-@        withProof :: x:a -> b -> {v:a | v = x} @-}
-{-@ define withProof    x      y            = (x) @-}
-withProof :: a -> b -> a
-withProof x _ = x
 
 {-@ impossible :: {v:a | false} -> b @-}
 impossible :: a -> b
@@ -156,10 +148,3 @@ impossible _ = undefined
 
 {-@ type Ix typ E = {v:typ | prop v = E} @-}
 
--------------------------------------------------------------------------------
--- PLE-specific
--------------------------------------------------------------------------------
-
-{-@ reflect pleUnfold @-}
-pleUnfold :: a -> a
-pleUnfold x = x

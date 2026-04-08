@@ -137,7 +137,7 @@ Monoid Laws for Lists
 ----------------------
 A [monoid](https://en.wikipedia.org/wiki/Monoid) is a set equipped 
 with a binary operation that is associative and has an identity element.
-%
+
 Lists as monoids! Because  they have an associative binary operation (list append)
 and a neutral element (empty list). 
 Let's prove the monoid laws for lists.
@@ -277,6 +277,16 @@ distributivity (x:xs) ys
   === reverse ys ++ (reverse xs ++ [x])
   === reverse ys ++ reverse (x:xs)
   *** QED  
+~~~~~
+
+Alternatively, we can use `rewriteWith` to further automate the proof, which is the following:
+
+~~~~~{.spec}
+distributivity [] ys
+  =   ()
+distributivity (x:xs) ys
+  =   distributivity xs ys 
+{-@ rewriteWith distributivity [appendAssoc, emptyLeftIdentity, emptyRightIdentity] @-}
 ~~~~~
 
 </details>
