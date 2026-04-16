@@ -23,9 +23,10 @@ library
     , Task1
     , Lecture_05_ProofsPrograms
     , Lecture_06_StructuralInduction
---     , Lecture_07_CaseStudyMapReduce
---     , Lecture_08_NaturalDeduction
---     , Lecture_09_DataPropositions
+    , Lecture_07_CaseStudyMapReduce
+    , Lecture_08_NaturalDeduction
+    , Lecture_09_DataPropositions
+    , Task2 
   other-modules:
       Language.Haskell.Liquid.ProofCombinators
   hs-source-dirs:

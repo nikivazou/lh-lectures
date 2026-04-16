@@ -128,7 +128,8 @@ the following specifications:
 {-@ drop :: i:Nat -> xs:{[a] | i <= len xs } 
          -> {v:[a] | len v == len xs - i } @-}
 drop :: Int -> [a] -> [a]
-drop i x = undefined  
+drop 0 x = x 
+drop i (_:xs) = drop (i-1) xs 
 \end{code}
 
 \begin{code}
@@ -136,7 +137,8 @@ drop i x = undefined
 {-@ take :: i:Nat -> xs:{[a] | i <= len xs } 
          -> {v:[a] | len v == i} @-}
 take :: Int -> [a] -> [a]
-take i x = undefined 
+take 0 _ = []
+take i (x:xs) = x : take (i-1) xs
 \end{code}
 
 
@@ -145,7 +147,10 @@ take i x = undefined
 \begin{code}
 {-@ reflect chunk @-}
 chunk :: Int -> [a] -> [[a]]
-chunk i x = [x] 
+{-@ chunk :: Int -> x:[a] -> [[a]] / [len x] @-}
+chunk i x 
+  | i <= 0 || length x <= i = [x]
+  | otherwise = take i x : chunk i (drop i x)
 \end{code}
 
 
@@ -199,7 +204,34 @@ The higher order theorem `mRTheorem` states that:
      / [len is]
   @-}
 mRTheorem :: Int -> ([a] -> b) -> (b -> b -> b) -> ([a] -> Proof) -> ([a] -> [a] -> Proof) -> [a] -> Proof
-mRTheorem n f op rightId distrib is = undefined 
+mRTheorem n f op rightId distrib is 
+  | n <= 0 || length is <= n 
+  =   mapReduce n f op is 
+  === reduce op (f []) (map f (chunk n is))
+  === reduce op (f []) [f is]
+  ? rightId is
+  === f is 
+  *** QED 
+
+mRTheorem n f op rightId distrib is
+  =   mapReduce n f op is 
+  === reduce op (f []) (map f (chunk n is))
+  === reduce op (f []) (map f (take n is : chunk n (drop n is)))
+  === reduce op (f []) (f (take n is) : map f (chunk n (drop n is)))
+  ===  op (f (take n is)) (reduce op (f []) (map f (chunk n (drop n is))))
+  ? mRTheorem n f op rightId distrib (drop n is)
+  === op (f (take n is)) (f (drop n is))
+  ? distrib (take n is) (drop n is)
+  === f (take n is ++ drop n is)
+   ? takeDrop n is
+  === f is   
+  *** QED
+
+takeDrop :: Int -> [a] -> Proof
+{-@ takeDrop :: i:Nat -> xs:{[a] | i <= len xs }
+             -> {take i xs ++ drop i xs == xs} @-}
+takeDrop 0 xs     = ()
+takeDrop n (_:xs) = takeDrop (n-1) xs
 \end{code}
 
 **Question:** What is the proof of `mRTheorem`?
