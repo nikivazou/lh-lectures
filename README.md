@@ -9,3 +9,6 @@ cd lh-lecures
 cabal update
 cabal build
 ```
+
+
+*Note:* It needs [z3](https://github.com/z3prover/z3) installed. 
